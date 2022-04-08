@@ -17,8 +17,6 @@ MAX_CANDLESTICKS = 130  #kolichestvo svechey  500
 CANDLESTICK_INTERVAL = '1m' #size of candlestick
 
 
-t = Timer(60)
-
 def attempt_to_make_trade(current_price):  #only buy or sell and current price
     print(current_price, weighted_moving_average_line_1, macd_line_1, macd_signal_line_1)
     if next_operation_buy is None:
@@ -77,11 +75,11 @@ def try_to_buy(current_price, resol=None): #condition buy
             last_price = current_price
     else:
         if current_price - last_price > 6: #1 condition - stoploss
-            place_buy_order(current_price)
+            place_buy_order(current_price, False)
             next_operation_buy = None
         if current_price > weighted_moving_average_line_2:  # profit
-            place_sell_order(current_price)
-            next_operation_buy = None
+            place_buy_order(current_price, False)
+            next_operation_buy = None 
   
 
 def try_to_sell(current_price, resol=None):
@@ -94,11 +92,12 @@ def try_to_sell(current_price, resol=None):
             last_price = current_price
     else:
         if last_price - current_price > 6 :    #1 condition - stoploss
-            place_sell_order(current_price)
+            place_sell_order(current_price, False)
             next_operation_buy = None
         if current_price < weighted_moving_average_line_2:  # profit
-            place_sell_order(current_price)
+            place_sell_order(current_price, False)
             next_operation_buy = None
+
 
 def get_request(symb):
     url = 'https://api.binance.com'
@@ -117,18 +116,22 @@ def get_request(symb):
         return [float(res[numb][4]) for numb in range(MAX_CANDLESTICKS)]
 
 
-def place_buy_order(current_price):
+def place_buy_order(current_price, first_step=True):
     print('Buy')
     with open('scalp_bot/journal.txt', 'a') as f:
-        f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Buy  - {current_price}$      {(current_price-last_price)/last_price*100 if next_operation_buy is not None else 0}\n')
+        if first_step:
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Buy  - {current_price}$\n')
+        else:
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Buy  - {current_price}$      {round((current_price-last_price)/last_price*100, 2)  if next_operation_buy is not None else 0}%\n')
 
-
-def place_sell_order(current_price):
+def place_sell_order(current_price, first_step=True):
     print('sell')
     with open('scalp_bot/journal.txt', 'a') as f:
-        f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Sell - {current_price}$       {(current_price-last_price)/last_price*100 if next_operation_buy is not None else 0}\n')
+        if first_step:
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Sell - {current_price}$\n')
+        else:
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Sell - {current_price}$      {round((last_price-current_price)/last_price*100, 2) if next_operation_buy is not None else 0}%\n')
 
-    
 def main():
     global price_candlesticks
     global moving_average_line_1
@@ -154,7 +157,7 @@ next_operation_buy = None
 last_price = 0
 price_candlesticks = [0] * MAX_CANDLESTICKS
 macd_buf = [0] * MAX_CANDLESTICKS
-
+t = Timer(60)
 
 macd_signal_line_1 = 0 
 macd_line_1 = 0
