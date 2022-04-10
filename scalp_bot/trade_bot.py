@@ -60,6 +60,7 @@ def macd():  #done
     return moving_average(MACD_SIGNAL, macd_buf[1:]+[macd_value]), macd_value  """
 
 def macd_start():
+    price_candlesticks = get_request('price_candlesticks')
     for numb in range(MACD_SIGNAL,0,-1):
         macd_value = moving_average(MACD_FAST, [0]*numb+price_candlesticks[:-numb]) - moving_average(MACD_SLOW, [0]*numb+price_candlesticks[:-numb])
         macd_buf.pop(0)
@@ -68,16 +69,21 @@ def macd_start():
 def try_to_buy(current_price, resol=None): #condition buy 
     global next_operation_buy 
     global last_price
+    global min_price
+    global max_price
+    if current_price < min_price: 
+        min_price = current_price 
     if resol is None:
-        if current_price > weighted_moving_average_line_1 and macd_line_1 < 0 and macd_signal_line_1 < 0 and abs(macd_line_1 - macd_signal_line_1)  < 0.03:  
+        if current_price > weighted_moving_average_line_1 and macd_line_1 < 0 and macd_signal_line_1 < 0 and abs(macd_line_1 - macd_signal_line_1)  < 0.1:  
             place_buy_order(current_price)
             next_operation_buy = False 
             last_price = current_price
+            max_price = current_price
     else:
         if current_price - last_price > 6: #1 condition - stoploss
             place_buy_order(current_price, False)
             next_operation_buy = None
-        if current_price > weighted_moving_average_line_2:  # profit
+        if current_price - min_price > 2:  # profit
             place_buy_order(current_price, False)
             next_operation_buy = None 
   
@@ -85,16 +91,21 @@ def try_to_buy(current_price, resol=None): #condition buy
 def try_to_sell(current_price, resol=None):
     global next_operation_buy
     global last_price
+    global max_price
+    global min_price
+    if current_price > max_price:
+        max_price = current_price
     if resol is None:
-        if current_price < weighted_moving_average_line_1 and macd_line_1 > 0 and macd_signal_line_1 > 0 and abs(macd_line_1 - macd_signal_line_1)  < 0.03: 
+        if current_price < weighted_moving_average_line_1 and macd_line_1 > 0 and macd_signal_line_1 > 0 and abs(macd_line_1 - macd_signal_line_1)  < 0.1: 
             place_sell_order(current_price)
             next_operation_buy = True
             last_price = current_price
+            min_price = current_price
     else:
         if last_price - current_price > 6 :    #1 condition - stoploss
             place_sell_order(current_price, False)
             next_operation_buy = None
-        if current_price < weighted_moving_average_line_2:  # profit
+        if max_price - current_price > 2:  # profit
             place_sell_order(current_price, False)
             next_operation_buy = None
 
@@ -118,19 +129,19 @@ def get_request(symb):
 
 def place_buy_order(current_price, first_step=True):
     print('Buy')
-    with open('scalp_bot/journal.txt', 'a') as f:
+    with open('trade_bot/scalp_bot/journal.txt', 'a') as f:
         if first_step:
             f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Buy  - {current_price}$\n')
         else:
-            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Buy  - {current_price}$      {round((current_price-last_price)/last_price*100, 2)  if next_operation_buy is not None else 0}%\n')
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Buy  - {current_price}$      {round((last_price-current_price)/last_price*100, 2)  if next_operation_buy is not None else 0}%\n')
 
 def place_sell_order(current_price, first_step=True):
     print('sell')
-    with open('scalp_bot/journal.txt', 'a') as f:
+    with open('trade_bot/scalp_bot/journal.txt', 'a') as f:
         if first_step:
-            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Sell - {current_price}$\n')
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} Sell - {current_price}$\n')
         else:
-            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Sell - {current_price}$      {round((last_price-current_price)/last_price*100, 2) if next_operation_buy is not None else 0}%\n')
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} Sell - {current_price}$      {round((current_price-last_price)/last_price*100, 2) if next_operation_buy is not None else 0}%\n')
 
 def main():
     global price_candlesticks
@@ -139,7 +150,6 @@ def main():
     global macd_signal_line_1
     global weighted_moving_average_line_1
     global weighted_moving_average_line_2
-    price_candlesticks = get_request('price_candlesticks')
     macd_start()   #counting previous values  
     while True:
         current_price = round(float(get_request('price')), 2)
@@ -158,6 +168,8 @@ last_price = 0
 price_candlesticks = [0] * MAX_CANDLESTICKS
 macd_buf = [0] * MAX_CANDLESTICKS
 t = Timer(60)
+max_price = 0
+min_price = 0  
 
 macd_signal_line_1 = 0 
 macd_line_1 = 0
@@ -166,4 +178,6 @@ weighted_moving_average_line_1 = 0
 
 
 if __name__ == '__main__':
+    with open('trade_bot/scalp_bot/journal.txt', 'a') as f:
+        f.write(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())+'\n')
     main()
