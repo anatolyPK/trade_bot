@@ -19,6 +19,7 @@ CANDLESTICK_INTERVAL = '1m' #size of candlestick
 
 def attempt_to_make_trade(current_price):  #only buy or sell and current price
     print(current_price, weighted_moving_average_line_1, macd_line_1, macd_signal_line_1)
+    print(min_price, max_price)
     if next_operation_buy is None:
         try_to_buy(current_price)
         try_to_sell(current_price)
@@ -27,11 +28,9 @@ def attempt_to_make_trade(current_price):  #only buy or sell and current price
     else: 
         try_to_sell(current_price, 1)
 
-
 def moving_average(ma_size, lst=None):  #done
     lst = price_candlesticks if lst is None else lst
     return sum(lst[MAX_CANDLESTICKS-ma_size:])/ma_size
-
     
 def weighted_moving_average(wma_size, lst=None): #done
     lst = price_candlesticks if lst is None else lst
@@ -47,17 +46,8 @@ def macd():  #done
         macd_buf.pop(0)
         macd_buf.append(macd_value)
         t.start()
-        return moving_average(MACD_SIGNAL, macd_buf), macd_value
+        return moving_average(MACD_SIGNAL, macd_buf), macd_value   
     return moving_average(MACD_SIGNAL, macd_buf[1:]+[macd_value]), macd_value 
-
-""" def macd():  #done
-    macd_value = weighted_moving_average(MACD_FAST) - weighted_moving_average(MACD_SLOW)
-    if t.is_ready():
-        macd_buf.pop(0)
-        macd_buf.append(macd_value)
-        t.start()
-        return weighted_moving_average(MACD_SIGNAL, macd_buf), macd_value
-    return moving_average(MACD_SIGNAL, macd_buf[1:]+[macd_value]), macd_value  """
 
 def macd_start():
     price_candlesticks = get_request('price_candlesticks')
@@ -87,7 +77,6 @@ def try_to_buy(current_price, resol=None): #condition buy
             place_buy_order(current_price, False)
             next_operation_buy = None 
   
-
 def try_to_sell(current_price, resol=None):
     global next_operation_buy
     global last_price
@@ -109,7 +98,6 @@ def try_to_sell(current_price, resol=None):
             place_sell_order(current_price, False)
             next_operation_buy = None
 
-
 def get_request(symb):
     url = 'https://api.binance.com'
     if symb == 'price':
@@ -126,14 +114,13 @@ def get_request(symb):
         res = requests.get(url+path, params=params).json()
         return [float(res[numb][4]) for numb in range(MAX_CANDLESTICKS)]
 
-
 def place_buy_order(current_price, first_step=True):
     print('Buy')
     with open('trade_bot/scalp_bot/journal.txt', 'a') as f:
         if first_step:
-            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Buy  - {current_price}$\n')
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} Buy  - {current_price}$\n')
         else:
-            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())} Buy  - {current_price}$      {round((last_price-current_price)/last_price*100, 2)  if next_operation_buy is not None else 0}%\n')
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} Buy  - {current_price}$      {round((last_price-current_price)/last_price*100, 2)  if next_operation_buy is not None else 0}%\n')
 
 def place_sell_order(current_price, first_step=True):
     print('sell')
@@ -150,6 +137,7 @@ def main():
     global macd_signal_line_1
     global weighted_moving_average_line_1
     global weighted_moving_average_line_2
+
     macd_start()   #counting previous values  
     while True:
         current_price = round(float(get_request('price')), 2)
